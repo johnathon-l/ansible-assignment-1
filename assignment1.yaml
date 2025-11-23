@@ -1,0 +1,66 @@
+- name: Configure routers with hostnames and interface descriptions
+  hosts: routers
+  gather_facts: no
+  tasks:
+    - name: Set hostname
+      ios_config:
+        lines:
+          - hostname "{{ device_hostname }}"
+      register: hostname_result
+      
+    - name: Debug hostname configuration result
+      debug:
+        var: hostname_result
+
+    - name: Set interface description on Ethernet0/0
+      ios_config:
+        lines:
+          - description "{{ interface_description }}"
+        parents: interface Ethernet0/0
+      register: interface_result
+      
+    - name: Debug interface description configuration result
+      debug:
+        var: interface_result
+
+    - name: Verify hostname configuration
+      ios_command:
+        commands:
+          - show running-config | include hostname
+      register: hostname_output
+      
+    - name: Debug hostname output
+      debug:
+        var: hostname_output.stdout_lines
+
+    - name: Verify interface description configuration
+      ios_command:
+        commands:
+          - show running-config interface Ethernet0/0
+      register: interface_output
+      
+    - name: Debug interface description output
+      debug:
+        var: interface_output.stdout_lines
+
+    - name: Set hostname verification string
+      set_fact:
+        hostname_check: "{{ hostname_output.stdout_lines[0] | join(' ') }}"
+
+    - name: Verify hostname matches expected value
+      assert:
+        that:
+          - device_hostname in hostname_check
+        fail_msg: "Hostname verification failed. Expected: {{ device_hostname }}, Got: {{ hostname_check }}"
+        success_msg: "Hostname verified successfully: {{ device_hostname }}"
+
+    - name: Set interface description verification string
+      set_fact:
+        interface_check: "{{ interface_output.stdout_lines | flatten | join(' ') }}"
+
+    - name: Verify interface description matches expected value
+      assert:
+        that:
+          - interface_description in interface_check
+        fail_msg: "Interface description verification failed. Expected: {{ interface_description }}, Got: {{ interface_check }}"
+        success_msg: "Interface description verified successfully: {{ interface_description }}"
